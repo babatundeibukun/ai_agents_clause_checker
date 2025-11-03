@@ -8,7 +8,6 @@ import os
 env_path = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(dotenv_path=env_path)
 
-print("DEBUG: GEMINI_API_KEY =", os.getenv("GEMINI_API_KEY"))
 
 from fastapi import FastAPI
 
@@ -20,9 +19,9 @@ from app.agent_card import agent_card
 
 
 
-from app.models.a2a import A2ARequest
-from app.analyzer import analyze_contract
-from app.agent_card import agent_card
+# from app.models.a2a import A2ARequest
+# from app.analyzer import analyze_contract
+# from app.agent_card import agent_card
 
 app = FastAPI(title="Telex Contract Checker Agent")
 
