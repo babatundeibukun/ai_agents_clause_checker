@@ -35,7 +35,7 @@ def get_agent_card():
     return JSONResponse(agent_card)
 
 @app.post("/a2a/contract-checker")
-def handle_a2a_request(a2a: A2ARequest):
+async def handle_a2a_request(a2a: A2ARequest, background_tasks:BackgroundTasks):
     """Handle A2A messages from Telex"""
     try:
         message = a2a.params.message.parts[0].text
