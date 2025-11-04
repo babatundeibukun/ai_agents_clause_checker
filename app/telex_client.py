@@ -1,20 +1,6 @@
-# import httpx
-# import os
-# from dotenv import load_dotenv
-
-# load_dotenv()
-
-# TELEX_WEBHOOK_URL = os.getenv("TELEX_WEBHOOK_URL")
-
-# async def send_to_telex(payload: dict):
-#     if not TELEX_WEBHOOK_URL:
-#         raise ValueError("Missing TELEX_WEBHOOK_URL in .env")
-#     async with httpx.AsyncClient() as client:
-#         response = await client.post(TELEX_WEBHOOK_URL, json=payload)
-#         return response.json()
-
 import httpx
 import os
+import uuid  # ✅ NEW: for generating messageId
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -53,6 +39,8 @@ async def send_telex_update(a2a, text: str):
                 "status": {
                     "state": "completed",
                     "message": {
+                        "kind": "message",                      
+                        "messageId": str(uuid.uuid4()),         
                         "role": "agent",
                         "parts": [{"kind": "text", "text": text}],
                     },
@@ -64,6 +52,7 @@ async def send_telex_update(a2a, text: str):
 
         async with httpx.AsyncClient() as client:
             await client.post(webhook_url, headers=headers, json=payload)
+            print("✅ Sent Telex update successfully.")
 
     except Exception as e:
         print(f"[Webhook Error] {e}")
