@@ -1,6 +1,7 @@
 from pathlib import Path
 from dotenv import load_dotenv
-
+from app.telex_client import send_telex_update
+import asyncio
 
 import os
 
@@ -10,7 +11,7 @@ load_dotenv(dotenv_path=env_path)
 
 
 from fastapi import FastAPI
-
+from fastapi import BackgroundTasks
 from fastapi.responses import JSONResponse
 from app.models.a2a import A2ARequest
 from app.analyzer import analyze_contract
@@ -38,6 +39,7 @@ def handle_a2a_request(a2a: A2ARequest):
     """Handle A2A messages from Telex"""
     try:
         message = a2a.params.message.parts[0].text
+        background_tasks.add_task(process_async_analysis, a2a, message)
         result = analyze_contract(message)
         return {
             "jsonrpc": "2.0",
@@ -62,7 +64,21 @@ def handle_a2a_request(a2a: A2ARequest):
             "error": {"message": str(e)},
         }
 
-if __name__ == "_main_":
+def process_async_analysis(a2a, message: str):
+    """Perform Gemini analysis and send result back via webhook."""
+    import asyncio
+    from app.analyzer import analyze_contract
+
+    async def inner():
+        try:
+            result = analyze_contract(message)
+            await send_telex_update(a2a, result)
+        except Exception as e:
+            await send_telex_update(a2a, f"❌ Error: {str(e)}")
+
+    asyncio.run(inner())
+
+if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("app.main:app", host="0.0.0.0", port=port,reload=True)
