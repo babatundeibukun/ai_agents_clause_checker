@@ -5,54 +5,73 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-TELEX_WEBHOOK_URL = os.getenv("TELEX_WEBHOOK_URL")
-
-
 async def send_telex_update(a2a, text: str):
     """
-    Send A2A task completion message to Telex via pushNotificationConfig.
-    This version fully aligns with the A2A JSON-RPC 2.0 message schema.
+    Final Telex-validated webhook payload.
+    ✅ Handles dict and object-style A2A params
+    ✅ Matches Telex JSON-RPC A2A schema
+    ✅ Includes kind: message, messageId, and task structure
     """
     try:
-        webhook_url = a2a.params.configuration.pushNotificationConfig.url
-        token = a2a.params.configuration.pushNotificationConfig.token
+        # --- Safely access configuration ---
+        params = a2a.params if isinstance(a2a.params, dict) else vars(a2a.params)
+        config = params.get("configuration", {})
+        if not isinstance(config, dict):
+            config = vars(config)
 
+        push_config = config.get("pushNotificationConfig", {})
+        if not isinstance(push_config, dict):
+            push_config = vars(push_config)
+
+        webhook_url = push_config.get("url")
+        token = push_config.get("token")
+
+        if not webhook_url or not token:
+            raise ValueError("Missing webhook URL or token in A2A payload")
+
+        # --- Build headers ---
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
         }
 
+        # --- Extract taskId safely ---
+        message = params.get("message", {})
+        if not isinstance(message, dict):
+            message = vars(message)
+
+        task_id = message.get("taskId", "task-auto")
+
+        # --- Build Telex-compliant payload ---
         payload = {
             "jsonrpc": "2.0",
-            "id": a2a.id,
+            "id": getattr(a2a, "id", str(uuid.uuid4())),
             "result": {
-                "kind": "task",  #  Telex expects top-level 'kind'
-                "id": a2a.params.message.taskId or str(uuid.uuid4()),
-                "contextId": str(uuid.uuid4()),
+                "kind": "task",
+                "id": task_id,
                 "status": {
                     "state": "completed",
                     "message": {
-                        "kind": "message",              #  REQUIRED
-                        "messageId": str(uuid.uuid4()), #  REQUIRED
-                        "role": "agent",                #  REQUIRED
+                        "kind": "message",
+                        "messageId": str(uuid.uuid4()),
+                        "role": "agent",
                         "parts": [
                             {
                                 "kind": "text",
-                                "text": text
+                                "text": text.strip(),
                             }
                         ],
-                        "taskId": a2a.params.message.taskId or "task-auto"
                     },
                 },
                 "artifacts": [],
-                "history": [],  #  Optional but recommended by Telex schema
             },
         }
 
+        # --- Send to Telex webhook ---
         async with httpx.AsyncClient() as client:
             response = await client.post(webhook_url, headers=headers, json=payload)
             response.raise_for_status()
-            print(f"Sent Telex-compliant update ({response.status_code})")
+            print(f"✅ Sent to Telex successfully ({response.status_code})")
             return response.json()
 
     except Exception as e:
