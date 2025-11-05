@@ -7,10 +7,8 @@ load_dotenv()
 
 async def send_telex_update(a2a, text: str):
     """
-    Final Telex-validated webhook payload.
-    ✅ Handles dict and object-style A2A params
-    ✅ Matches Telex JSON-RPC A2A schema
-    ✅ Includes kind: message, messageId, and task structure
+    ✅ Final Telex-compliant webhook payload.
+    Fixes the 'messageId field required' error by nesting message properly.
     """
     try:
         # --- Safely access configuration ---
@@ -42,7 +40,7 @@ async def send_telex_update(a2a, text: str):
 
         task_id = message.get("taskId", "task-auto")
 
-        # --- Build Telex-compliant payload ---
+        # --- Build FINAL Telex-compliant payload ---
         payload = {
             "jsonrpc": "2.0",
             "id": getattr(a2a, "id", str(uuid.uuid4())),
@@ -52,15 +50,17 @@ async def send_telex_update(a2a, text: str):
                 "status": {
                     "state": "completed",
                     "message": {
-                        "kind": "message",
-                        "messageId": str(uuid.uuid4()),
-                        "role": "agent",
-                        "parts": [
-                            {
-                                "kind": "text",
-                                "text": text.strip(),
-                            }
-                        ],
+                        "message": {  # ✅ <-- the missing wrapper
+                            "kind": "message",
+                            "messageId": str(uuid.uuid4()),
+                            "role": "agent",
+                            "parts": [
+                                {
+                                    "kind": "text",
+                                    "text": text.strip(),
+                                }
+                            ],
+                        }
                     },
                 },
                 "artifacts": [],
